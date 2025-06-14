@@ -5,7 +5,7 @@ import time
 from token_manager import get_access_token
 from db_config import DB_CONFIG
 
-# Auth and headers
+# === Auth ===
 print("🔐 Fetching access token...")
 access_token = get_access_token()
 print(f"✅ Using token: {access_token[:10]}...")
@@ -15,24 +15,25 @@ headers = {
     "Accept": "application/json"
 }
 
-# Calculate yesterday's timestamp
+# === Setup ===
 yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
-SEARCH_URL = f"https://brassfields.retail.lightspeed.app/api/2.0/search?type=products&filter=updated_at>{yesterday}&order_direction=asc&page_size=1000&offset={{offset}}"
+SEARCH_URL = (
+    "https://brassfields.retail.lightspeed.app/api/2.0/search?"
+    f"type=products&filter=updated_at>{yesterday}&order_direction=asc&page_size=1000&offset={{offset}}"
+)
 
-# Database connection
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# Back up current products table
+# === Backups ===
 backup_table_name = f"products_sales_{datetime.now().strftime('%Y%m%d')}"
 cursor.execute(f"CREATE TABLE IF NOT EXISTS {backup_table_name} AS SELECT * FROM products")
 
-# Delete backup from 7 days ago
 cutoff_date = datetime.now() - timedelta(days=7)
 old_backup_table = f"products_sales_{cutoff_date.strftime('%Y%m%d')}"
 cursor.execute(f"DROP TABLE IF EXISTS {old_backup_table}")
 
-# Helper: get UPC or fallback code
+# === Helpers ===
 def get_product_code(product):
     codes = product.get("product_codes", [])
     for code in codes:
@@ -40,7 +41,6 @@ def get_product_code(product):
             return code.get("code"), code.get("type")
     return (codes[0].get("code"), codes[0].get("type")) if codes else (None, None)
 
-# Helper: get most recent sale date
 def get_most_recent_sale(product_id):
     cursor.execute("""
         SELECT sale_date FROM sales_lines
@@ -51,7 +51,7 @@ def get_most_recent_sale(product_id):
     result = cursor.fetchone()
     return result[0] if result else None
 
-# Loop through paginated results
+# === Sync Loop ===
 offset = 0
 inserted = 0
 updated = 0
@@ -60,6 +60,7 @@ while True:
     print(f"🔄 Fetching products updated since yesterday (offset={offset})...")
     url = SEARCH_URL.format(offset=offset)
     response = requests.get(url, headers=headers)
+    
     if response.status_code != 200:
         print(f"❌ Error {response.status_code}: {response.text}")
         break
@@ -76,12 +77,9 @@ while True:
         description = product.get("description")
         supply_price = str(product.get("supply_price", ""))
         retail_price = str(product.get("price_including_tax", ""))
-        brand = product.get("brand")
-        brand_name = brand.get("name") if brand else None
-        supplier = product.get("supplier")
-        supplier_name = supplier.get("name") if supplier else None
-        category = product.get("product_category")
-        product_category = category.get("name") if category else None
+        brand_name = product.get("brand", {}).get("name")
+        supplier_name = product.get("supplier", {}).get("name")
+        product_category = product.get("product_category", {}).get("name")
         tags = ",".join(product.get("tag_ids", []))
         outlet_tax = str(product.get("outlet_taxes", [{}])[0].get("rate")) if product.get("outlet_taxes") else None
         sku = product.get("sku")
@@ -94,7 +92,7 @@ while True:
         # Check if product exists
         cursor.execute("SELECT * FROM products WHERE id = %s", (prod_id,))
         existing = cursor.fetchone()
-        while cursor.nextset(): pass
+        while cursor.nextset(): pass  # clean up pending result sets
 
         if existing:
             update_query = """
@@ -134,6 +132,6 @@ while True:
     offset += 1000
     time.sleep(0.3)
 
-print(f"✅ Done! Inserted: {inserted}, Updated: {updated}")
+print(f"✅ Sync complete! Inserted: {inserted}, Updated: {updated}")
 cursor.close()
 conn.close()
