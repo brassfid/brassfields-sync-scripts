@@ -2,11 +2,15 @@ import requests
 import json
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
-# === Configuration ===
-CLIENT_ID = "2k5xVYAEq66VT35joN1eA09pMmzoDyZy"
-CLIENT_SECRET = "w7JA3IYRZikb3g4YttQqmA63gPs9Oc59"
-TOKEN_URL = "https://brassfields.vendhq.com/api/1.0/token"
+# Load .env variables
+load_dotenv()
+
+# === Configuration (securely loaded from environment) ===
+CLIENT_ID = os.getenv("LIGHTSPEED_CLIENT_ID")
+CLIENT_SECRET = os.getenv("LIGHTSPEED_CLIENT_SECRET")
+TOKEN_URL = os.getenv("LIGHTSPEED_TOKEN_URL")
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), "token_data.json")
 
 
