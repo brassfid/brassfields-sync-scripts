@@ -77,7 +77,8 @@ while True:
         description = product.get("description")
         supply_price = str(product.get("supply_price", ""))
         retail_price = str(product.get("price_including_tax", ""))
-        brand_name = product.get("brand", {}).get("name")
+        brand = product.get("brand") or {}
+        brand_name = brand.get("name", "")
         supplier_name = product.get("supplier", {}).get("name")
         product_category = product.get("product_category", {}).get("name")
         tags = ",".join(product.get("tag_ids", []))
