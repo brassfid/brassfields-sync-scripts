@@ -6,7 +6,7 @@ from token_manager import get_access_token
 from db_config import DB_CONFIG
 
 # === Auth ===
-print("\U0001f510 Fetching access token...")
+print("🔐 Fetching access token...")
 access_token = get_access_token()
 print(f"✅ Using token: {access_token[:10]}...")
 
@@ -19,7 +19,7 @@ headers = {
 yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
 SEARCH_URL = (
     "https://brassfields.retail.lightspeed.app/api/2.0/search?"
-    f"type=products&expand=inventory_levels&filter=updated_at>{yesterday}&order_direction=asc&page_size=1000&offset={{offset}}"
+    f"type=products&filter=updated_at>{yesterday}&order_direction=asc&page_size=1000&offset={{offset}}"
 )
 
 conn = mysql.connector.connect(**DB_CONFIG)
@@ -51,13 +51,49 @@ def get_most_recent_sale(product_id):
     result = cursor.fetchone()
     return result[0] if result else None
 
+def fetch_inventory_map():
+    print("📦 Fetching inventory data...")
+    inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    inventory_map = {}
+    offset = 0
+    while True:
+        paged_url = f"{inventory_url}?limit=1000&offset={offset}"
+        response = requests.get(paged_url, headers=headers)
+
+        if response.status_code != 200:
+            print(f"❌ Inventory request failed: {response.status_code} {response.text}")
+            break
+
+        data = response.json().get("data", [])
+        if not data:
+            break
+
+        for item in data:
+            product_id = item.get("product_id")
+            count = item.get("count")
+            if product_id:
+                inventory_map[product_id] = count
+
+        offset += 1000
+
+    print(f"✅ Inventory records pulled: {len(inventory_map)}")
+    return inventory_map
+
+# === Fetch Inventory ===
+inventory_map = fetch_inventory_map()
+
 # === Sync Loop ===
 offset = 0
 inserted = 0
 updated = 0
 
 while True:
-    print(f"\U0001f501 Fetching products updated since yesterday (offset={offset})...")
+    print(f"🔁 Fetching products updated since yesterday (offset={offset})...")
     url = SEARCH_URL.format(offset=offset)
     response = requests.get(url, headers=headers)
 
@@ -101,11 +137,7 @@ while True:
             product_code, product_code_type = get_product_code(product)
             most_recent_sale = get_most_recent_sale(prod_id)
 
-            inventory_count = None
-            for level in product.get("inventory_levels", []):
-                if level.get("outlet_id") == "06e94082-ed4f-11ee-f619-85357b2ae2f0":
-                    inventory_count = level.get("count")
-                    break
+            inventory_count = inventory_map.get(prod_id)
 
             # Check if product exists
             cursor.execute("SELECT * FROM products WHERE id = %s", (prod_id,))
