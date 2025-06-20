@@ -51,42 +51,6 @@ def get_most_recent_sale(product_id):
     result = cursor.fetchone()
     return result[0] if result else None
 
-def fetch_inventory_map():
-    print("📦 Fetching inventory data...")
-    inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"Bearer {access_token}"
-    }
-
-    inventory_map = {}
-    offset = 0
-    while True:
-        paged_url = f"{inventory_url}?limit=1000&offset={offset}"
-        response = requests.get(paged_url, headers=headers)
-
-        if response.status_code != 200:
-            print(f"❌ Inventory request failed: {response.status_code} {response.text}")
-            break
-
-        data = response.json().get("data", [])
-        if not data:
-            break
-
-        for item in data:
-            product_id = item.get("product_id")
-            count = item.get("count")
-            if product_id:
-                inventory_map[product_id] = count
-
-        offset += 1000
-
-    print(f"✅ Inventory records pulled: {len(inventory_map)}")
-    return inventory_map
-
-# === Fetch Inventory ===
-inventory_map = fetch_inventory_map()
-
 # === Sync Loop ===
 offset = 0
 inserted = 0
@@ -137,8 +101,6 @@ while True:
             product_code, product_code_type = get_product_code(product)
             most_recent_sale = get_most_recent_sale(prod_id)
 
-            inventory_count = inventory_map.get(prod_id)
-
             # Check if product exists
             cursor.execute("SELECT * FROM products WHERE id = %s", (prod_id,))
             existing = cursor.fetchone()
@@ -151,14 +113,14 @@ while True:
                         brand_name=%s, supplier_name=%s, product_category=%s, tags=%s,
                         outlet_tax_341_Douglas=%s, sku=%s, active_online=%s,
                         last_synced_at=%s, product_code=%s, product_code_type=%s,
-                        most_recent_sale=%s, inventory_count=%s
+                        most_recent_sale=%s
                     WHERE id=%s
                 """
                 values = (
                     name, handle, description, supply_price, retail_price, brand_name,
                     supplier_name, product_category, tags, outlet_tax, sku, active_online,
                     last_synced_at, product_code, product_code_type, most_recent_sale,
-                    inventory_count, prod_id
+                    prod_id
                 )
                 cursor.execute(update_query, values)
                 updated += 1
@@ -168,14 +130,13 @@ while True:
                         id, name, handle, description, supply_price, retail_price, brand_name,
                         supplier_name, product_category, tags, outlet_tax_341_Douglas, sku,
                         active_online, created_at, last_synced_at, product_code, product_code_type,
-                        most_recent_sale, inventory_count
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        most_recent_sale
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values = (
                     prod_id, name, handle, description, supply_price, retail_price, brand_name,
                     supplier_name, product_category, tags, outlet_tax, sku, active_online,
-                    created_at, last_synced_at, product_code, product_code_type, most_recent_sale,
-                    inventory_count
+                    created_at, last_synced_at, product_code, product_code_type, most_recent_sale
                 )
                 cursor.execute(insert_query, values)
                 inserted += 1
