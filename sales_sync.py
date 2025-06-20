@@ -19,7 +19,7 @@ headers = {
 central = ZoneInfo("America/Chicago")
 
 # Get yesterday in Central Time
-yesterday = (datetime.now(central) - timedelta(days=3)).date()
+yesterday = (datetime.now(central) - timedelta(days=1)).date()
 
 # Build datetime range in Central Time
 start_ct = datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0, tzinfo=central)
