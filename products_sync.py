@@ -1,4 +1,4 @@
-import requests
+fimport requests
 import mysql.connector
 from datetime import datetime, timedelta
 import time
@@ -103,7 +103,7 @@ while True:
 
             inventory_count = None
             for level in product.get("inventory_levels", []):
-                if level.get("outlet_id") == "341_Douglas":
+                if level.get("outlet_id") == "06e94082-ed4f-11ee-f619-85357b2ae2f0":
                     inventory_count = level.get("count")
                     break
 
