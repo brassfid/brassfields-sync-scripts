@@ -40,8 +40,9 @@ def fetch_inventory():
         for item in data:
             product_id = item.get("product_id")
             if offset == 0 and total_updated < 1:
-            print("🧪 Sample inventory record:", item)
+            print("🧪 Sample inventory record:", item)    
             count = item.get("count")
+
 
             if product_id is None or count is None:
                 continue
