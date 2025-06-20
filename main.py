@@ -19,7 +19,7 @@ print("⏰ Job runner started at", datetime.now().isoformat())
 # time.sleep(5)
 
 # Step 4: Add Inventory
-print("\n🔁 Running products_sync.py...")
+print("\n🔁 Running products_sync_inventory.py...")
 subprocess.run(["python", "products_sync_inventory.py"], check=True)
 
 # Step 5: Run sales sync
