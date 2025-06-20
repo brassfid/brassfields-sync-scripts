@@ -1,4 +1,4 @@
-fimport requests
+import requests
 import mysql.connector
 from datetime import datetime, timedelta
 import time
