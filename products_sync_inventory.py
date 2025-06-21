@@ -17,9 +17,9 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory to product_lines ===
-def sync_inventory_to_product_lines():
-    print("📦 Syncing inventory to product_lines table...")
+# === Sync Inventory to products ===
+def sync_inventory_to_products():
+    print("📦 Syncing inventory to products table...")
     inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
     offset = 0
     total_updated = 0
@@ -50,7 +50,7 @@ def sync_inventory_to_product_lines():
 
             try:
                 cursor.execute(
-                    "UPDATE product_lines SET inventory_count = %s WHERE product_id = %s",
+                    "UPDATE products SET inventory_count = %s WHERE product_id = %s",
                     (count, product_id)
                 )
                 total_updated += cursor.rowcount
@@ -64,7 +64,7 @@ def sync_inventory_to_product_lines():
     print(f"✅ Inventory sync complete. Total updated: {total_updated}")
 
 # === Run ===
-sync_inventory_to_product_lines()
+sync_inventory_to_products()
 
 cursor.close()
 conn.close()
