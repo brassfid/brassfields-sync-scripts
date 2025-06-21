@@ -2,6 +2,7 @@ import requests
 import mysql.connector
 from db_config import DB_CONFIG
 from token_manager import get_access_token
+import time
 
 # === Auth ===
 print("🔐 Getting access token...")
@@ -16,51 +17,46 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Get all product IDs in our database ===
+# === Fetch product IDs ===
 cursor.execute("SELECT id FROM products")
-existing_product_ids = set(row[0] for row in cursor.fetchall())
+product_ids = [row[0] for row in cursor.fetchall()]
 
-# === Sync Inventory ===
-def sync_inventory_to_products():
-    print("📦 Syncing inventory to products table...")
-    inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
-    offset = 0
-    total_updated = 0
+print(f"📦 Syncing inventory for {len(product_ids)} products...")
 
-    while True:
-        paged_url = f"{inventory_url}?limit=1000&offset={offset}"
-        response = requests.get(paged_url, headers=headers, timeout=15)
+updated = 0
 
+for i, product_id in enumerate(product_ids):
+    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?filter=product_id=={product_id}"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200:
-            print(f"❌ Request failed: {response.status_code} {response.text}")
-            break
+            print(f"⚠️ {i}: Failed to fetch inventory for {product_id} - {response.status_code}")
+            continue
 
         data = response.json().get("data", [])
         if not data:
-            print("✅ No more inventory data.")
-            break
+            continue
 
-        for item in data:
-            product_id = item.get("product_id")
-            count = item.get("current_amount")
+        # Sum current_amounts across all outlets (if any)
+        total_amount = sum(int(record.get("current_amount", 0)) for record in data)
 
-            if product_id in existing_product_ids and count is not None and count != 0:
-                try:
-                    cursor.execute(
-                        "UPDATE products SET inventory_count = %s WHERE id = %s",
-                        (count, product_id)
-                    )
-                    total_updated += cursor.rowcount
-                except Exception as e:
-                    print(f"⚠️ Failed to update product_id {product_id}: {e}")
+        cursor.execute(
+            "UPDATE products SET inventory_count = %s WHERE id = %s",
+            (total_amount, product_id)
+        )
+        updated += cursor.rowcount
 
-        conn.commit()
-        offset += 1000
-        print(f"🔁 Offset {offset} processed, total updated: {total_updated}")
+        if i < 5:
+            print(f"🧪 {i}: product_id={product_id}, inventory={total_amount}")
 
-    print(f"✅ Inventory sync complete. Total updated: {total_updated}")
+        # Be polite to API
+        time.sleep(0.1)
 
-# === Run ===
-sync_inventory_to_products()
+    except Exception as e:
+        print(f"❌ {i}: Error for product_id {product_id} - {e}")
+
+conn.commit()
 cursor.close()
 conn.close()
+
+print(f"✅ Inventory sync complete. Total products updated: {updated}")
