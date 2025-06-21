@@ -39,7 +39,7 @@ def sync_inventory_to_products():
 
         for i, item in enumerate(data):
             product_id = item.get("product_id")
-            count = item.get("current_amount")  # ✅ Correct field
+            count = item.get("current_amount")
 
             if i < 5:
                 print(f"🧪 Inventory record {i}: product_id={product_id}, current_amount={count}")
@@ -50,7 +50,7 @@ def sync_inventory_to_products():
 
             try:
                 cursor.execute(
-                    "UPDATE products SET inventory_count = %s WHERE product_id = %s",
+                    "UPDATE products SET inventory_count = %s WHERE id = %s",
                     (count, product_id)
                 )
                 total_updated += cursor.rowcount
