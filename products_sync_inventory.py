@@ -8,7 +8,7 @@ print("🔐 Getting access token...")
 access_token = get_access_token()
 
 # === API setup ===
-url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory?after=1001"
+url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory?after=2001"
 headers = {
     "Authorization": f"Bearer {access_token}",
     "Accept": "application/json"
