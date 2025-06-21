@@ -1,5 +1,6 @@
 import requests
 import mysql.connector
+import json
 from db_config import DB_CONFIG
 from token_manager import get_access_token
 
@@ -38,10 +39,11 @@ def sync_inventory_to_product_lines():
 
         for i, item in enumerate(data):
             product_id = item.get("product_id")
-            count = item.get("count")
+            count = item.get("on_hand") or item.get("available")  # use correct inventory field
 
             if i < 5:
                 print(f"🧪 Inventory record {i}: product_id={product_id}, count={count}")
+                print(json.dumps(item, indent=2))  # full item print for debugging
 
             if product_id is None or count is None:
                 continue
