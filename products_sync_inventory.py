@@ -3,40 +3,44 @@ import mysql.connector
 from db_config import DB_CONFIG
 from token_manager import get_access_token
 
-# === Get access token ===
+# === Step 1: Get access token ===
 print("🔐 Getting access token...")
 access_token = get_access_token()
 
-# === API setup ===
-url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory?after=2001"
 headers = {
     "Authorization": f"Bearer {access_token}",
     "Accept": "application/json"
 }
 
-# === DB connection ===
+# === Step 2: Connect to DB and fetch product IDs ===
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
+cursor.execute("SELECT id FROM products")
+product_ids = [row[0] for row in cursor.fetchall()]
+print(f"📦 Checking inventory for {len(product_ids)} products...\n")
 
-print("📦 Fetching inventory (after=1001) and updating inventory_cache...\n")
-
-response = requests.get(url, headers=headers, timeout=15)
-
+# === Step 3: Loop and fetch inventory per product ===
 inserted = 0
 
-if response.status_code != 200:
-    print(f"❌ API Error {response.status_code}: {response.text}")
-else:
-    data = response.json().get("data", [])
-    print(f"🔎 Retrieved {len(data)} records")
+for i, product_id in enumerate(product_ids):
+    url = f"https://brassfields.retail.lightspeed.app/api/2.0/products/{product_id}/inventory"
 
-    for i, record in enumerate(data):
-        product_id = record.get("product_id")
-        outlet_id = record.get("outlet_id")
-        current_amount = record.get("current_amount")
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            print(f"⚠️ Failed for {product_id}: HTTP {response.status_code}")
+            continue
 
-        if product_id and outlet_id and current_amount is not None:
-            try:
+        data = response.json().get("data", [])
+        if not data:
+            continue
+
+        # Loop through all outlet-specific inventory entries
+        for item in data:
+            outlet_id = item.get("outlet_id")
+            current_amount = item.get("current_amount")
+
+            if product_id and outlet_id and current_amount is not None:
                 cursor.execute("""
                     INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
                     VALUES (%s, %s, %s)
@@ -45,15 +49,15 @@ else:
                         last_updated = CURRENT_TIMESTAMP
                 """, (product_id, outlet_id, current_amount))
                 inserted += 1
-                if i < 5:
-                    print(f"✅ {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
-            except Exception as e:
-                print(f"⚠️ SQL error inserting record {i}: {e}")
-        else:
-            print(f"⚠️ Skipping incomplete record {i}: {record}")
 
-    conn.commit()
+        if i < 5:
+            print(f"🧪 {i}: product_id={product_id}, outlets={len(data)}")
 
-print(f"\n✅ Done. Total inserted or updated: {inserted}")
+    except Exception as e:
+        print(f"❌ Error for {product_id}: {e}")
+
+# === Finalize ===
+conn.commit()
 cursor.close()
 conn.close()
+print(f"\n✅ Inventory cache updated for {inserted} records.")
