@@ -112,15 +112,14 @@ while True:
                         brand_name=%s, supplier_name=%s, product_category=%s, tags=%s,
                         outlet_tax_341_Douglas=%s, sku=%s, active_online=%s,
                         last_synced_at=%s, product_code=%s, product_code_type=%s,
-                        most_recent_sale=%s, product_uuid=%s
+                        most_recent_sale=%s
                     WHERE id=%s
                 """
                 values = (
                     name, handle, description, supply_price, retail_price, brand_name,
                     supplier_name, product_category, tags, outlet_tax, sku, active_online,
                     last_synced_at, product_code, product_code_type, most_recent_sale,
-                    prod_id,  # product_uuid
-                    prod_id   # WHERE id = prod_id
+                    prod_id
                 )
                 cursor.execute(update_query, values)
                 updated += 1
@@ -130,14 +129,13 @@ while True:
                         id, name, handle, description, supply_price, retail_price, brand_name,
                         supplier_name, product_category, tags, outlet_tax_341_Douglas, sku,
                         active_online, created_at, last_synced_at, product_code, product_code_type,
-                        most_recent_sale, product_uuid
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        most_recent_sale
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 values = (
                     prod_id, name, handle, description, supply_price, retail_price, brand_name,
                     supplier_name, product_category, tags, outlet_tax, sku, active_online,
-                    created_at, last_synced_at, product_code, product_code_type, most_recent_sale,
-                    prod_id  # product_uuid
+                    created_at, last_synced_at, product_code, product_code_type, most_recent_sale
                 )
                 cursor.execute(insert_query, values)
                 inserted += 1
