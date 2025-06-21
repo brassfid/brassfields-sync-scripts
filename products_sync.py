@@ -1,6 +1,5 @@
 import requests
 import mysql.connector
-from datetime import datetime
 from db_config import DB_CONFIG
 from token_manager import get_access_token
 
@@ -17,12 +16,11 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory with Pagination ===
+# === Sync Inventory to inventory_cache ===
 print("📦 Syncing inventory to inventory_cache table...")
 offset = 0
 page_size = 1000
-total_updated = 0
-seen_ids = set()
+inserted = 0
 
 while True:
     url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={page_size}&offset={offset}"
@@ -33,20 +31,19 @@ while True:
         break
 
     data = response.json().get("data", [])
-    print(f"🔎 Retrieved {len(data)} records at offset {offset}")
-
     if not data:
         print("🚫 No more inventory data.")
         break
+
+    print(f"🔎 Retrieved {len(data)} records at offset {offset}")
 
     for i, item in enumerate(data):
         product_id = item.get("product_id")
         outlet_id = item.get("outlet_id")
         current_amount = item.get("current_amount")
 
-        if not product_id or product_id in seen_ids:
+        if product_id is None or current_amount is None:
             continue
-        seen_ids.add(product_id)
 
         if i < 5 and offset == 0:
             print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
@@ -60,13 +57,13 @@ while True:
                     outlet_id = VALUES(outlet_id),
                     last_updated = CURRENT_TIMESTAMP
             """, (product_id, outlet_id, current_amount))
-            total_updated += 1
+            inserted += 1
         except Exception as e:
-            print(f"⚠️ Failed to insert/update product_id {product_id}: {e}")
+            print(f"⚠️ Error inserting {product_id}: {e}")
 
     conn.commit()
     offset += page_size
 
-print(f"✅ Inventory caching complete. Total inserted or updated: {total_updated}")
+print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
 cursor.close()
 conn.close()
