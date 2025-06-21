@@ -39,11 +39,11 @@ def sync_inventory_to_product_lines():
 
         for i, item in enumerate(data):
             product_id = item.get("product_id")
-            count = item.get("on_hand") or item.get("available")  # use correct inventory field
+            count = item.get("current_amount")  # ✅ Correct field
 
             if i < 5:
-                print(f"🧪 Inventory record {i}: product_id={product_id}, count={count}")
-                print(json.dumps(item, indent=2))  # full item print for debugging
+                print(f"🧪 Inventory record {i}: product_id={product_id}, current_amount={count}")
+                print(json.dumps(item, indent=2))
 
             if product_id is None or count is None:
                 continue
