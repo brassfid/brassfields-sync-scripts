@@ -1,37 +1,38 @@
 import requests
 import mysql.connector
 from db_config import DB_CONFIG
-from token_manager import get_access_token
 
-# === Auth ===
-print("🔐 Getting access token...")
-access_token = get_access_token()
+# === Direct Access Token ===
+access_token = "lsxs_at_sOp7JJlmSfluWAt8UtotRtULjN097RUK"
 
 headers = {
-    "Authorization": f"Bearer {access_token}",
-    "Accept": "application/json"
+    "accept": "application/json",
+    "authorization": f"Bearer {access_token}"
 }
 
 # === Connect to DB ===
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Step: Pull ALL inventory records from Lightspeed ===
-print("📦 Fetching full inventory from Lightspeed...")
+# === Begin Pagination ===
+url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
 offset = 0
-inserted = 0
+limit = 1000
+total_updated = 0
+
+print("📦 Fetching inventory and updating inventory_cache...\n")
 
 while True:
-    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit=1000&offset={offset}"
-    response = requests.get(url, headers=headers, timeout=15)
+    paged_url = f"{url}?limit={limit}&offset={offset}"
+    response = requests.get(paged_url, headers=headers, timeout=20)
 
     if response.status_code != 200:
-        print(f"❌ Request failed at offset {offset}: {response.status_code}")
+        print(f"❌ Error: {response.status_code} - {response.text}")
         break
 
     data = response.json().get("data", [])
     if not data:
-        print("✅ Done fetching inventory records.")
+        print("✅ Done: No more inventory data.")
         break
 
     for i, item in enumerate(data):
@@ -47,18 +48,18 @@ while True:
                 VALUES (%s, %s)
                 ON DUPLICATE KEY UPDATE current_amount = VALUES(current_amount)
             """, (product_id, current_amount))
-            inserted += 1
+            total_updated += 1
 
-            if offset == 0 and i < 5:
-                print(f"🧪 {i}: {product_id}, current_amount = {current_amount}")
+            if i < 5 and offset == 0:
+                print(f"🧪 {i}: product_id={product_id}, current_amount={current_amount}")
+
         except Exception as e:
-            print(f"⚠️ DB error for {product_id}: {e}")
+            print(f"⚠️ Failed to update {product_id}: {e}")
 
     conn.commit()
-    offset += 1000
-    print(f"🔁 Offset {offset} processed. Total inserted/updated: {inserted}")
+    offset += limit
+    print(f"🔁 Offset {offset} done, total so far: {total_updated}")
 
-# === Done ===
-print(f"✅ Inventory cache completed. Total products processed: {inserted}")
+print(f"\n✅ inventory_cache updated: {total_updated} total records.")
 cursor.close()
 conn.close()
