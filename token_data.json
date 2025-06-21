@@ -2,7 +2,7 @@
   "access_token":"lsxs_at_sOp7JJlmSfluWAt8UtotRtULjN097RUK",
   "domain_prefix":"brassfields",
   "expires_in": 259199,
-  "expires_at": "2025-06-24T12:00:00"
+  "expires_at": "2025-06-24T12:00:00",
   "refresh_token":"lsxs_rt_6BZKVXFwYx7GCLKuSGa0XocLhGWsNfQv",
   "scope": "",
   "token_type": "Bearer"
