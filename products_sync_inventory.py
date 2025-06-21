@@ -17,7 +17,6 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory to inventory_cache ===
 def sync_inventory_to_cache():
     print("📦 Syncing inventory to inventory_cache table...")
     inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
@@ -33,6 +32,8 @@ def sync_inventory_to_cache():
             break
 
         data = response.json().get("data", [])
+        print(f"🔎 Retrieved {len(data)} records at offset {offset}")
+
         if not data:
             print("✅ No more inventory data.")
             break
@@ -41,11 +42,11 @@ def sync_inventory_to_cache():
             product_id = item.get("product_id")
             count = item.get("current_amount")
 
-            if i < 5:
-                print(f"🧪 Inventory record {i}: product_id={product_id}, current_amount={count}")
-                print(json.dumps(item, indent=2))
+            if i < 10:
+                print(f"🧪 {i}: product_id={product_id}, current_amount={count}")
 
             if product_id is None or count is None:
+                print(f"⚠️ Skipping invalid record: {json.dumps(item, indent=2)}")
                 continue
 
             try:
@@ -56,18 +57,18 @@ def sync_inventory_to_cache():
                         current_amount = VALUES(current_amount),
                         last_updated = CURRENT_TIMESTAMP
                 """, (product_id, count))
-                total_inserted += 1
+                total_inserted += cursor.rowcount
             except Exception as e:
-                print(f"⚠️ Failed to insert product_id {product_id}: {e}")
+                print(f"❌ DB insert failed for product_id={product_id}: {e}")
 
         conn.commit()
         offset += 1000
-        print(f"🔁 Offset {offset} processed, total inserted/updated: {total_inserted}")
 
-    print(f"✅ Inventory caching complete. Total inserted/updated: {total_inserted}")
+        if len(data) < 1000:
+            break
 
-# === Run ===
+    print(f"✅ Inventory caching complete. Total inserted or updated: {total_inserted}")
+
 sync_inventory_to_cache()
-
 cursor.close()
 conn.close()
