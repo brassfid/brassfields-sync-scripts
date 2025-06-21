@@ -12,53 +12,57 @@ headers = {
     "Accept": "application/json"
 }
 
-# === Connect to Database ===
+# === Connect to DB ===
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-def sync_inventory():
+# === Sync Inventory to product_lines ===
+def sync_inventory_to_product_lines():
     print("📦 Syncing inventory to product_lines table...")
-    url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
+    inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
     offset = 0
     total_updated = 0
 
     while True:
-        paged_url = f"{url}?limit=1000&offset={offset}"
+        paged_url = f"{inventory_url}?limit=1000&offset={offset}"
         response = requests.get(paged_url, headers=headers, timeout=15)
 
         if response.status_code != 200:
-            print(f"❌ Error {response.status_code}: {response.text}")
+            print(f"❌ Request failed: {response.status_code} {response.text}")
             break
 
-        inventory_data = response.json().get("data", [])
-        if not inventory_data:
-            print("✅ All inventory records processed.")
+        data = response.json().get("data", [])
+        if not data:
+            print("✅ No more inventory data.")
             break
 
-        for item in inventory_data:
+        for i, item in enumerate(data):
             product_id = item.get("product_id")
             count = item.get("count")
+
+            if i < 5:
+                print(f"🧪 Inventory record {i}: product_id={product_id}, count={count}")
 
             if product_id is None or count is None:
                 continue
 
             try:
-                cursor.execute("""
-                    UPDATE product_lines
-                    SET inventory_count = %s
-                    WHERE product_id = %s
-                """, (count, product_id))
+                cursor.execute(
+                    "UPDATE product_lines SET inventory_count = %s WHERE product_id = %s",
+                    (count, product_id)
+                )
                 total_updated += cursor.rowcount
             except Exception as e:
-                print(f"⚠️ Error updating product_id {product_id}: {e}")
+                print(f"⚠️ Failed to update product_id {product_id}: {e}")
 
         conn.commit()
         offset += 1000
         print(f"🔁 Offset {offset} processed, total updated: {total_updated}")
 
-    print(f"✅ Inventory sync finished. Total rows updated: {total_updated}")
+    print(f"✅ Inventory sync complete. Total updated: {total_updated}")
 
 # === Run ===
-sync_inventory()
+sync_inventory_to_product_lines()
+
 cursor.close()
 conn.close()
