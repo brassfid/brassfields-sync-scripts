@@ -21,21 +21,20 @@ print("📦 Syncing inventory to inventory_cache table...")
 
 inserted = 0
 seen = set()
-limit = 1000
 
-for page in range(3):  # Only process 3 pages
-    offset = page * limit
-    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={limit}&offset={offset}"
+def fetch_and_insert(offset):
+    global inserted
+    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit=1000&offset={offset}"
     response = requests.get(url, headers=headers, timeout=15)
 
     if response.status_code != 200:
-        print(f"❌ Request failed: {response.status_code} {response.text}")
-        break
+        print(f"❌ Request failed at offset {offset}: {response.status_code} {response.text}")
+        return
 
     data = response.json().get("data", [])
     if not data:
         print(f"🚫 No data found at offset {offset}.")
-        break
+        return
 
     print(f"🔎 Retrieved {len(data)} records at offset {offset}")
 
@@ -71,6 +70,11 @@ for page in range(3):  # Only process 3 pages
             print(f"⚠️ Error inserting {product_id}: {e}")
 
     conn.commit()
+
+# === Hardcoded Calls ===
+fetch_and_insert(0)
+fetch_and_insert(1000)
+fetch_and_insert(2000)
 
 print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
 cursor.close()
