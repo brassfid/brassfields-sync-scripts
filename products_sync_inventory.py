@@ -19,12 +19,12 @@ cursor = conn.cursor()
 # === Sync Inventory to inventory_cache table ===
 print("📦 Syncing inventory to inventory_cache table...")
 
-offset = 0
-limit = 1000
 inserted = 0
 seen = set()
+limit = 1000
 
-while True:
+for page in range(3):  # Only process 3 pages
+    offset = page * limit
     url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={limit}&offset={offset}"
     response = requests.get(url, headers=headers, timeout=15)
 
@@ -34,18 +34,17 @@ while True:
 
     data = response.json().get("data", [])
     if not data:
-        print("🚫 No more inventory data.")
+        print(f"🚫 No data found at offset {offset}.")
         break
 
     print(f"🔎 Retrieved {len(data)} records at offset {offset}")
 
-    new_items = 0
     for i, item in enumerate(data):
         product_id = item.get("product_id")
         outlet_id = item.get("outlet_id")
         current_amount = item.get("current_amount")
 
-        if product_id is None or current_amount is None or outlet_id is None:
+        if product_id is None or outlet_id is None or current_amount is None:
             continue
 
         key = (product_id, outlet_id)
@@ -68,16 +67,10 @@ while True:
                 (product_id, outlet_id, current_amount)
             )
             inserted += 1
-            new_items += 1
         except Exception as e:
             print(f"⚠️ Error inserting {product_id}: {e}")
 
     conn.commit()
-    if new_items == 0:
-        print("🚫 No new unique products found — ending pagination.")
-        break
-
-    offset += limit
 
 print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
 cursor.close()
