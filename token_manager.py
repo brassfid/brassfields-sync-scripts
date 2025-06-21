@@ -12,21 +12,25 @@ CLIENT_SECRET = os.getenv("LIGHTSPEED_CLIENT_SECRET")
 TOKEN_URL = os.getenv("LIGHTSPEED_TOKEN_URL")
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), "token_data.json")
 
-
 def load_token_data():
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, "r") as f:
             return json.load(f)
     raise FileNotFoundError(f"❌ {TOKEN_FILE} not found. Run exchange_token.py first.")
 
-
 def save_token_data(token_data):
     with open(TOKEN_FILE, "w") as f:
         json.dump(token_data, f, indent=2)
     print(f"💾 Saved refreshed tokens to {TOKEN_FILE}")
 
-
 def refresh_token_if_needed(token_data):
+    # If token_data doesn't have expires_at, add it now
+    if "expires_at" not in token_data and "expires_in" in token_data:
+        token_data["expires_at"] = (
+            datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
+        ).strftime("%Y-%m-%dT%H:%M:%S")
+        save_token_data(token_data)
+
     expires_at_str = token_data.get("expires_at")
     if not expires_at_str:
         raise Exception("❌ No expires_at in token_data.json. Please refresh manually.")
@@ -66,7 +70,6 @@ def refresh_token_if_needed(token_data):
     save_token_data(new_data)
     print("✅ Token refreshed successfully.")
     return new_data["access_token"]
-
 
 def get_access_token():
     token_data = load_token_data()
