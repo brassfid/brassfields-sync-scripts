@@ -1,6 +1,5 @@
 import requests
 import mysql.connector
-import json
 from db_config import DB_CONFIG
 from token_manager import get_access_token
 
@@ -17,7 +16,11 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory to products ===
+# === Get all product IDs in our database ===
+cursor.execute("SELECT id FROM products")
+existing_product_ids = set(row[0] for row in cursor.fetchall())
+
+# === Sync Inventory ===
 def sync_inventory_to_products():
     print("📦 Syncing inventory to products table...")
     inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
@@ -37,30 +40,21 @@ def sync_inventory_to_products():
             print("✅ No more inventory data.")
             break
 
-        updates = []
-
-        for i, item in enumerate(data):
+        for item in data:
             product_id = item.get("product_id")
             count = item.get("current_amount")
 
-            if i < 5:
-                print(f"🧪 Inventory record {i}: product_id={product_id}, current_amount={count}")
-                print(json.dumps(item, indent=2))
+            if product_id in existing_product_ids and count is not None and count != 0:
+                try:
+                    cursor.execute(
+                        "UPDATE products SET inventory_count = %s WHERE id = %s",
+                        (count, product_id)
+                    )
+                    total_updated += cursor.rowcount
+                except Exception as e:
+                    print(f"⚠️ Failed to update product_id {product_id}: {e}")
 
-            if product_id is not None and count is not None:
-                updates.append((count, product_id))
-
-        if updates:
-            try:
-                cursor.executemany(
-                    "UPDATE products SET inventory_count = %s WHERE product_id = %s",
-                    updates
-                )
-                conn.commit()
-                total_updated += cursor.rowcount
-            except Exception as e:
-                print(f"⚠️ Failed batch update: {e}")
-
+        conn.commit()
         offset += 1000
         print(f"🔁 Offset {offset} processed, total updated: {total_updated}")
 
@@ -68,6 +62,5 @@ def sync_inventory_to_products():
 
 # === Run ===
 sync_inventory_to_products()
-
 cursor.close()
 conn.close()
