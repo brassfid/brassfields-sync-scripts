@@ -16,14 +16,16 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory to inventory_cache ===
+# === Sync Inventory to inventory_cache table ===
 print("📦 Syncing inventory to inventory_cache table...")
+
 offset = 0
-page_size = 1000
+limit = 1000
 inserted = 0
+seen = set()
 
 while True:
-    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={page_size}&offset={offset}"
+    url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={limit}&offset={offset}"
     response = requests.get(url, headers=headers, timeout=15)
 
     if response.status_code != 200:
@@ -37,13 +39,19 @@ while True:
 
     print(f"🔎 Retrieved {len(data)} records at offset {offset}")
 
+    new_items = 0
     for i, item in enumerate(data):
         product_id = item.get("product_id")
         outlet_id = item.get("outlet_id")
         current_amount = item.get("current_amount")
 
-        if product_id is None or current_amount is None:
+        if product_id is None or current_amount is None or outlet_id is None:
             continue
+
+        key = (product_id, outlet_id)
+        if key in seen:
+            continue
+        seen.add(key)
 
         if i < 5 and offset == 0:
             print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
@@ -54,16 +62,3 @@ while True:
                 VALUES (%s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     current_amount = VALUES(current_amount),
-                    outlet_id = VALUES(outlet_id),
-                    last_updated = CURRENT_TIMESTAMP
-            """, (product_id, outlet_id, current_amount))
-            inserted += 1
-        except Exception as e:
-            print(f"⚠️ Error inserting {product_id}: {e}")
-
-    conn.commit()
-    offset += page_size
-
-print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
-cursor.close()
-conn.close()
