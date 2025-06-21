@@ -57,8 +57,28 @@ while True:
             print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
                 VALUES (%s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     current_amount = VALUES(current_amount),
+                    last_updated = CURRENT_TIMESTAMP
+                """,
+                (product_id, outlet_id, current_amount)
+            )
+            inserted += 1
+            new_items += 1
+        except Exception as e:
+            print(f"⚠️ Error inserting {product_id}: {e}")
+
+    conn.commit()
+    if new_items == 0:
+        print("🚫 No new unique products found — ending pagination.")
+        break
+
+    offset += limit
+
+print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
+cursor.close()
+conn.close()
