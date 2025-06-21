@@ -44,33 +44,36 @@ while True:
         outlet_id = item.get("outlet_id")
         current_amount = item.get("current_amount")
 
+        if not product_id or not outlet_id:
+            continue
+
         key = (product_id, outlet_id)
         if key in seen_keys:
             continue
         seen_keys.add(key)
 
-        if product_id and outlet_id is not None:
-            try:
-                cursor.execute("""
-                    INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
-                    VALUES (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE current_amount = VALUES(current_amount)
-                """, (product_id, outlet_id, current_amount))
-                total_updated += cursor.rowcount
-                new_records += 1
-                if i < 5 and offset == 0:
-                    print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
-            except Exception as e:
-                print(f"⚠️ Failed to insert {product_id} @ {outlet_id}: {e}")
+        try:
+            cursor.execute("""
+                INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE current_amount = VALUES(current_amount)
+            """, (product_id, outlet_id, current_amount))
+            total_updated += cursor.rowcount
+            new_records += 1
+
+            if i < 3 and offset == 0:
+                print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
+        except Exception as e:
+            print(f"⚠️ Failed to insert {product_id}: {e}")
 
     conn.commit()
     offset += limit
 
     if new_records == 0:
-        print("🚫 No new unique products found — ending pagination.\n")
+        print("🚫 No new unique records — ending pagination.")
         break
 
-print(f"✅ Inventory caching complete. Total inserted or updated: {total_updated}\n")
+print(f"\n✅ Inventory caching complete. Total inserted/updated: {total_updated}")
 
 cursor.close()
 conn.close()
