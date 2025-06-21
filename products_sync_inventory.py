@@ -16,65 +16,54 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-def sync_inventory_to_cache():
-    print("📦 Syncing inventory to inventory_cache table...")
-    inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
-    offset = 0
-    total_inserted = 0
-    seen_product_ids = set()
+# === Log start ===
+print("📦 Syncing inventory to inventory_cache table...")
 
-    while True:
-        paged_url = f"{inventory_url}?limit=1000&offset={offset}"
-        response = requests.get(paged_url, headers=headers, timeout=15)
+# === Fetch and insert inventory data ===
+inventory_url = "https://brassfields.retail.lightspeed.app/api/2.0/inventory"
+offset = 0
+limit = 1000
+total_updated = 0
 
-        if response.status_code != 200:
-            print(f"❌ Request failed: {response.status_code} {response.text}")
-            break
+while True:
+    paged_url = f"{inventory_url}?limit={limit}&offset={offset}"
+    response = requests.get(paged_url, headers=headers, timeout=20)
 
-        data = response.json().get("data", [])
-        print(f"🔎 Retrieved {len(data)} records at offset {offset}")
+    if response.status_code != 200:
+        print(f"❌ API error at offset {offset}: {response.status_code} {response.text[:100]}")
+        break
 
-        if not data:
-            print("✅ No more inventory data.")
-            break
+    data = response.json().get("data", [])
+    print(f"🔎 Retrieved {len(data)} records at offset {offset}")
+    
+    if not data:
+        print("✅ No more data. Ending pagination.")
+        break
 
-        new_product_found = False
-        for i, item in enumerate(data):
-            product_id = item.get("product_id")
-            count = item.get("current_amount")
+    for i, item in enumerate(data):
+        product_id = item.get("product_id")
+        outlet_id = item.get("outlet_id")
+        current_amount = item.get("current_amount")
 
-            if not product_id or product_id in seen_product_ids:
-                continue
+        if not product_id or current_amount is None:
+            continue
 
-            seen_product_ids.add(product_id)
+        if i < 5:
+            print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
 
-            if count is None or count == 0:
-                continue
+        try:
+            cursor.execute("""
+                INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE current_amount = VALUES(current_amount), last_updated = CURRENT_TIMESTAMP
+            """, (product_id, outlet_id, current_amount))
+            total_updated += cursor.rowcount
+        except Exception as e:
+            print(f"⚠️ Failed to insert/update {product_id}: {e}")
 
-            new_product_found = True
+    conn.commit()
+    offset += limit
 
-            if i < 10:
-                print(f"🧪 {i}: product_id={product_id}, current_amount={count}")
-
-            try:
-                cursor.execute("""
-                    INSERT INTO inventory_cache (product_id, current_amount)
-                    VALUES (%s, %s)
-                    ON DUPLICATE KEY UPDATE current_amount = VALUES(current_amount), last_updated = CURRENT_TIMESTAMP
-                """, (product_id, count))
-                total_inserted += cursor.rowcount
-            except Exception as e:
-                print(f"❌ DB insert failed for product_id={product_id}: {e}")
-
-        conn.commit()
-        offset += 1000
-
-        if not new_product_found:
-            print("🚫 No new unique products found — ending pagination.")
-            break
-
-    print(f"\n✅ Inventory caching complete. Total inserted or updated: {total_inserted}")
-
-sync_inventory_to_cache()
+print(f"✅ Inventory caching complete. Total inserted or updated: {total_updated}")
 cursor.close()
 conn.close()
