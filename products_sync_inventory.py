@@ -37,6 +37,8 @@ def sync_inventory_to_products():
             print("✅ No more inventory data.")
             break
 
+        updates = []
+
         for i, item in enumerate(data):
             product_id = item.get("product_id")
             count = item.get("current_amount")
@@ -45,19 +47,20 @@ def sync_inventory_to_products():
                 print(f"🧪 Inventory record {i}: product_id={product_id}, current_amount={count}")
                 print(json.dumps(item, indent=2))
 
-            if product_id is None or count is None:
-                continue
+            if product_id is not None and count is not None:
+                updates.append((count, product_id))
 
+        if updates:
             try:
-                cursor.execute(
-                    "UPDATE products SET inventory_count = %s WHERE id = %s",
-                    (count, product_id)
+                cursor.executemany(
+                    "UPDATE products SET inventory_count = %s WHERE product_id = %s",
+                    updates
                 )
+                conn.commit()
                 total_updated += cursor.rowcount
             except Exception as e:
-                print(f"⚠️ Failed to update product_id {product_id}: {e}")
+                print(f"⚠️ Failed batch update: {e}")
 
-        conn.commit()
         offset += 1000
         print(f"🔁 Offset {offset} processed, total updated: {total_updated}")
 
