@@ -74,3 +74,8 @@ def refresh_token_if_needed(token_data):
 def get_access_token():
     token_data = load_token_data()
     return refresh_token_if_needed(token_data)
+
+# ✅ This is the function your refresh_token.py script needs
+def refresh_token():
+    token_data = load_token_data()
+    return refresh_token_if_needed(token_data)
