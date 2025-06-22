@@ -16,11 +16,11 @@ headers = {
 conn = mysql.connector.connect(**DB_CONFIG)
 cursor = conn.cursor()
 
-# === Sync Inventory to inventory_cache ===
-print("📦 Syncing inventory to inventory_cache table...")
+# === Sync Inventory to products table ===
+print("📦 Syncing inventory to products table...")
 offset = 0
 page_size = 1000
-inserted = 0
+updated = 0
 
 while True:
     url = f"https://brassfields.retail.lightspeed.app/api/2.0/inventory?limit={page_size}&offset={offset}"
@@ -39,31 +39,28 @@ while True:
 
     for i, item in enumerate(data):
         product_id = item.get("product_id")
-        outlet_id = item.get("outlet_id")
         current_amount = item.get("current_amount")
 
         if product_id is None or current_amount is None:
             continue
 
         if i < 5 and offset == 0:
-            print(f"🧪 {i}: product_id={product_id}, outlet_id={outlet_id}, current_amount={current_amount}")
+            print(f"🧪 {i}: product_id={product_id}, current_amount={current_amount}")
 
         try:
             cursor.execute("""
-                INSERT INTO inventory_cache (product_id, outlet_id, current_amount)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    current_amount = VALUES(current_amount),
-                    outlet_id = VALUES(outlet_id),
-                    last_updated = CURRENT_TIMESTAMP
-            """, (product_id, outlet_id, current_amount))
-            inserted += 1
+                UPDATE products
+                SET inventory_count = %s
+                WHERE id = %s
+            """, (current_amount, product_id))
+            if cursor.rowcount > 0:
+                updated += 1
         except Exception as e:
-            print(f"⚠️ Error inserting {product_id}: {e}")
+            print(f"⚠️ Error updating {product_id}: {e}")
 
     conn.commit()
     offset += page_size
 
-print(f"\n✅ Inventory caching complete. Total inserted or updated: {inserted}")
+print(f"\n✅ Inventory update complete. Total rows updated: {updated}")
 cursor.close()
 conn.close()
