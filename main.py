@@ -16,11 +16,14 @@ print("\n🔁 Running products_sync.py...")
 subprocess.run(["python", "products_sync.py"], check=True)
 
 # Optional short pause between jobs
-time.sleep(5)
+time.sleep(60)
 
 # Step 4: Add Inventory
 print("\n🔁 Running products_sync_inventory.py...")
 subprocess.run(["python", "products_sync_inventory.py"], check=True)
+
+# Optional short pause between jobs
+time.sleep(60)
 
 # Step 5: Run sales sync
 print("\n🔁 Running sales_sync.py...")
