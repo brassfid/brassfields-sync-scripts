@@ -129,7 +129,14 @@ while True:
             )
             cursor.execute(insert_query, values)
             inserted += 1
-
+            
+        # ✅ Tag sync: clear old links and add new ones
+        cursor.execute("DELETE FROM product_tags WHERE product_id = %s", (prod_id,))
+        for tag_id in product.get("tag_ids", []):
+            cursor.execute("""
+                INSERT IGNORE INTO product_tags (product_id, tag_id)
+                VALUES (%s, %s)
+            """, (prod_id, tag_id))
     conn.commit()
     offset += 1000
     time.sleep(0.3)
