@@ -5,11 +5,11 @@ from datetime import datetime
 print("⏰ Job runner started at", datetime.now().isoformat())
 
 # ✅ Step 1: Refresh token
-# print("\n🔁 Running refresh_token.py...")
-# subprocess.run(["python", "refresh_token.py"], check=True)
+print("\n🔁 Running refresh_token.py...")
+subprocess.run(["python", "refresh_token.py"], check=True)
 
 # ✅ Optional: give token_manager a moment to write token
-# time.sleep(10)
+time.sleep(10)
 
 # ✅ Step 2: Sync Tags
 print("\n🔁 Running sync_tags.py...")
